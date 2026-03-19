@@ -1,0 +1,7 @@
+@echo off
+setlocal
+chcp 65001 >nul
+
+python limitup_sector_updater_v5.py --proxy-mode direct --industry TDX_Industry_merged.xlsx --stats "2026-01 涨停板块统计（涨停数大于3标红加粗）.xlsx" --output "涨停板块统计_自动更新.xlsx"
+
+pause
