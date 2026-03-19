@@ -179,3 +179,12 @@ You can create issues such as:
 - Add command-line config file support
 
 This helps show the project is actively maintained.
+## Screenshots
+
+### Run Example
+
+![Run Example](docs/板块涨停热力图.png)
+
+### Daily Summary
+
+![Daily Summary](docs/每日涨停总数.png)
