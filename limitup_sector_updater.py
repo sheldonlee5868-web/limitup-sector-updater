@@ -646,7 +646,7 @@ def fetch_limit_up_pool(trade_date: str, retries: int, sleep_seconds: float, pro
         sleep_seconds=sleep_seconds,
     )
     if df is None or df.empty:
-        return pd.DataFrame(columns=["代码", "名称", "连板数"])
+        raise RuntimeError(f"涨停股池返回空数据：{trade_date}")
 
     if "代码" not in df.columns or "名称" not in df.columns:
         raise RuntimeError(f"涨停股池返回字段异常：{trade_date}")

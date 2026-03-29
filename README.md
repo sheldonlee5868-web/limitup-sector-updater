@@ -143,6 +143,81 @@ The tool generates an Excel workbook that includes:
 
 
 
+```md
+## What's New in v0.1.1
+
+`v0.1.1` is a reliability and maintainability update on top of `v0.1.0`, focused on safer historical rebuilds, Dashboard refresh workflow, logging visibility, and better compatibility in proxy/network environments.
+
+### Highlights
+
+- Fixed the issue where empty limit-up pool responses could be silently written as `0`
+- Added three running modes:
+  - `update`: daily incremental update
+  - `rebuild`: rebuild for a specified date range
+  - `dashboard`: refresh Dashboard only
+- Added `--proxy-mode auto/direct`
+  - `auto`: use system/environment proxy first and automatically fall back to direct mode on proxy errors
+  - `direct`: disable proxy environment variables from startup
+- Improved logging
+  - auto-generated log files
+  - success/failed trading date summary
+  - output path and log path tracking
+- Added automatic Dashboard rebuild
+  - daily total limit-up line chart
+  - combined turnover line chart for SSE + SZSE indexes
+  - turnover delta bar chart
+  - last 60 trading days sector heatmap
+- Improved abnormal date column detection and ignore logic
+- Improved index history fetching by trying Eastmoney direct API first and falling back to akshare if needed
+
+### Usage Examples
+
+#### 1. Daily incremental update
+​```bash
+python limitup_sector_updater_v5.py ^
+  --industry TDX_Industry_merged.xlsx ^
+  --stats "涨停板块统计_自动更新.xlsx" ^
+  --output "涨停板块统计_自动更新.xlsx"
+
+
+## 更新说明（v0.1.1）
+
+`v0.1.1` 是在 `v0.1.0` 基础上的一次稳定性和可维护性更新，重点改进了历史重算、Dashboard 刷新、日志可追踪性，以及代理环境下的数据抓取兼容性。
+
+### 本版本更新内容
+
+- 修复涨停股池返回空数据时被误写为 `0` 的问题，避免生成错误统计结果
+- 新增三种运行模式：
+  - `update`：日常增量更新
+  - `rebuild`：指定区间重算
+  - `dashboard`：仅刷新 Dashboard 图表页
+- 新增 `--proxy-mode auto/direct`
+  - `auto`：默认读取系统/环境代理，若检测到代理异常则自动切换直连
+  - `direct`：启动时直接禁用代理环境变量
+- 增强日志系统
+  - 自动生成日志文件
+  - 输出成功/失败交易日摘要
+  - 记录输出文件与日志路径
+- Dashboard 支持自动重建
+  - 每日总涨停数折线图
+  - 上证指数 + 深证成指总成交额折线图
+  - 较前一日成交额变化柱状图
+  - 最近 60 个交易日板块热力表
+- 改进异常日期列识别与忽略逻辑
+- 优化指数历史数据抓取逻辑，优先尝试东财直连接口，失败后回退到 akshare
+
+### 使用示例
+
+#### 1. 日常增量更新
+​```bash
+python limitup_sector_updater_v5.py ^
+  --industry TDX_Industry_merged.xlsx ^
+  --stats "涨停板块统计_自动更新.xlsx" ^
+  --output "涨停板块统计_自动更新.xlsx"
+```
+
+
+
 
 
 ------
