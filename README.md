@@ -188,3 +188,13 @@ This helps show the project is actively maintained.
 ### Daily Summary
 
 ![Daily Summary](docs/每日涨停总数.png)
+
+## Screenshots
+
+### Run Example
+
+![Run Example](docs/板块涨停热力图.png)
+
+### Daily Summary
+
+![Daily Summary](docs/每日涨停总数.png)
