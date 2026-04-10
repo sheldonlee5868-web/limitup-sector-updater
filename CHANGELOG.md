@@ -44,3 +44,34 @@
   - 优化异常日期列识别与忽略逻辑
   - 提升 Windows + PowerShell / Git Bash 环境下的可用性
   - 提高历史重算失败时的可见性和可追踪性
+
+## v0.1.2 - 2026-04-10
+
+### Improved
+- Enhanced the Dashboard heatmap to make sector activity more vivid and easier to read
+- Added clearer heat-level color segmentation for recent 60-day sector limit-up counts
+- Added a heatmap legend for faster interpretation
+- Added daily totals and sector summary indicators to improve readability
+- Added a latest trading day sector ranking area
+- Improved the overall Dashboard layout and presentation quality
+
+### Compatibility
+- No changes to command-line usage
+- No changes to `update`, `rebuild`, or `dashboard` mode invocation
+- Existing Excel output workflow remains compatible
+
+## v0.1.2 - 2026-04-10
+
+### 优化
+- 优化 Dashboard 热力图展示效果，使板块热度分布更生动、更易读
+- 为最近 60 日板块涨停数增加更清晰的热度分级配色
+- 新增热力图图例，便于快速理解颜色含义
+- 新增单日合计与板块汇总指标，提升信息可读性
+- 新增最新交易日板块排行区域
+- 整体优化 Dashboard 的布局与展示效果
+
+### 兼容性
+- 不改变命令行使用方式
+- 不影响 `update`、`rebuild`、`dashboard` 三种模式的调用方式
+- 兼容现有 Excel 输出流程
+

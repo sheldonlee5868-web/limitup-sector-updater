@@ -133,7 +133,19 @@ The tool generates an Excel workbook that includes:
 
 
 
+## What's New in v0.1.2
 
+This release improves the Dashboard presentation without changing the existing CLI workflow.
+
+### Highlights
+- more vivid and readable 60-day sector heatmap
+- clearer heat-level color segmentation
+- heatmap legend for easier interpretation
+- daily totals and summary indicators
+- latest trading day sector ranking area
+
+### Compatibility
+All existing commands remain unchanged.
 
 
 
@@ -214,6 +226,17 @@ python limitup_sector_updater_v5.py ^
   --industry TDX_Industry_merged.xlsx ^
   --stats "涨停板块统计_自动更新.xlsx" ^
   --output "涨停板块统计_自动更新.xlsx"
+
+### Dashboard Visualization
+
+The generated Dashboard includes:
+
+- recent 60-day sector heatmap
+- latest trading day sector ranking
+- summary KPI cards
+- turnover and market sentiment charts
+
+As of `v0.1.2`, the heatmap visualization has been enhanced with clearer heat-level color bands, a legend, daily total indicators, and improved layout presentation, while keeping the existing command-line usage unchanged.
 ```
 
 
