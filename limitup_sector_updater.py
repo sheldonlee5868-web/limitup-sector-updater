@@ -62,8 +62,8 @@ import pandas as pd
 import requests
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, LineChart, Reference
-from openpyxl.formatting.rule import ColorScaleRule
-from openpyxl.styles import Alignment, Font
+from openpyxl.chart.label import DataLabelList
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 try:
@@ -794,41 +794,179 @@ def parse_summary_metrics(value: object) -> Tuple[Optional[int], Optional[float]
     return total_count, turnover_total, turnover_delta
 
 
+def parse_market_tag(value: object) -> str:
+    if value in (None, ""):
+        return ""
+    lines = str(value).splitlines()
+    if len(lines) < 2:
+        return ""
+    line2 = lines[1]
+    for tag in ("上涨", "下跌", "震荡"):
+        if line2.endswith(tag):
+            return tag
+    return ""
+
+
+def apply_cell_border(cell, color: str = "FFD9E2F3") -> None:
+    side = Side(style="thin", color=color)
+    cell.border = Border(left=side, right=side, top=side, bottom=side)
+
+
+def style_card_block(ws, start_col: int, end_col: int, title_row: int, value_row: int, title: str, value: object, fill_color: str) -> None:
+    ws.merge_cells(start_row=title_row, start_column=start_col, end_row=title_row, end_column=end_col)
+    ws.merge_cells(start_row=value_row, start_column=start_col, end_row=value_row, end_column=end_col)
+    title_cell = ws.cell(title_row, start_col)
+    value_cell = ws.cell(value_row, start_col)
+
+    title_cell.value = title
+    value_cell.value = value
+
+    title_fill = PatternFill("solid", fgColor=fill_color)
+    value_fill = PatternFill("solid", fgColor="FFF8FBFF")
+
+    title_cell.fill = title_fill
+    value_cell.fill = value_fill
+    title_cell.font = Font(color="FFFFFFFF", bold=True, size=11)
+    value_cell.font = Font(color="FF1F1F1F", bold=True, size=13)
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+    value_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    for row in (title_row, value_row):
+        for col in range(start_col, end_col + 1):
+            apply_cell_border(ws.cell(row, col), color="FFB7C9E2")
+
+
+def build_heat_fill(value: int) -> Tuple[str, str]:
+    if value <= 0:
+        return "FFF3F6FB", "FF7A869A"
+    if value == 1:
+        return "FFD9F0FF", "FF0F3B5F"
+    if value == 2:
+        return "FFADE8F4", "FF083D4F"
+    if value == 3:
+        return "FF95D5B2", "FF10451D"
+    if value == 4:
+        return "FFFFE08A", "FF6B4F00"
+    if value == 5:
+        return "FFFFC971", "FF6A2E00"
+    if value == 6:
+        return "FFFF9B71", "FF6A1B00"
+    return "FFF94144", "FFFFFFFF"
+
+
+def beautify_chart(chart, style_id: int, y_title: str, x_title: str) -> None:
+    chart.style = style_id
+    chart.y_axis.title = y_title
+    chart.x_axis.title = x_title
+    chart.legend = None
+    chart.height = 8
+    chart.width = 16
+    if getattr(chart, "x_axis", None) is not None:
+        chart.x_axis.tickLblPos = "low"
+    if getattr(chart, "y_axis", None) is not None:
+        chart.y_axis.majorGridlines = None
+
+
+def write_heat_legend(ws, row: int, start_col: int) -> None:
+    items = [
+        ("0", "FFF3F6FB", "FF7A869A"),
+        ("1", "FFD9F0FF", "FF0F3B5F"),
+        ("2", "FFADE8F4", "FF083D4F"),
+        ("3", "FF95D5B2", "FF10451D"),
+        ("4", "FFFFE08A", "FF6B4F00"),
+        ("5", "FFFFC971", "FF6A2E00"),
+        ("6", "FFFF9B71", "FF6A1B00"),
+        ("7+", "FFF94144", "FFFFFFFF"),
+    ]
+    ws.cell(row, start_col).value = "热度图例"
+    ws.cell(row, start_col).font = Font(bold=True, color="FF1F1F1F")
+    for idx, (label, fill_color, font_color) in enumerate(items, start=1):
+        cell = ws.cell(row, start_col + idx)
+        cell.value = label
+        cell.fill = PatternFill("solid", fgColor=fill_color)
+        cell.font = Font(color=font_color, bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        apply_cell_border(cell, color="FFE2E8F0")
+
+
 def rebuild_dashboard(wb: Workbook, ws_main, sector_order: List[str], row_map: Dict[str, int]) -> None:
     if "Dashboard" in wb.sheetnames:
         del wb["Dashboard"]
     ws = wb.create_sheet("Dashboard")
-    ws.freeze_panes = "B2"
+    ws.sheet_view.showGridLines = False
+    ws.freeze_panes = "B8"
+
+    title_fill = PatternFill("solid", fgColor="FF173F5F")
+    section_fill = PatternFill("solid", fgColor="FF1D4E89")
+    header_fill = PatternFill("solid", fgColor="FFEAF2FF")
+    stripe_fill = PatternFill("solid", fgColor="FFF8FBFF")
+    strong_font = Font(bold=True, color="FF1F1F1F")
+    white_font = Font(bold=True, color="FFFFFFFF")
+    center = Alignment(horizontal="center", vertical="center")
 
     date_map = get_existing_date_map(ws_main)
     sorted_items = sorted(date_map.items(), key=lambda x: x[0])
 
+    ws.merge_cells("A1:F2")
+    ws["A1"] = "涨停板块热力总览"
+    ws["A1"].fill = title_fill
+    ws["A1"].font = Font(color="FFFFFFFF", bold=True, size=16)
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center")
+
+    subtitle = "暂无可展示数据"
+    if sorted_items:
+        subtitle = f"统计区间：{sorted_items[0][0]} ~ {sorted_items[-1][0]}｜最近 60 个交易日热力图"
+    ws.merge_cells("A3:F3")
+    ws["A3"] = subtitle
+    ws["A3"].font = Font(color="FF4A5568", italic=True)
+
+    # 汇总表起始位置
+    summary_header_row = 6
+    summary_data_row = summary_header_row + 1
+
+    latest_date = "-"
+    latest_total = "-"
+    latest_turnover = "-"
+    hottest_sector = "-"
+    hottest_count = "-"
+
+    if sorted_items:
+        latest_date, latest_col = sorted_items[-1]
+        latest_summary = ws_main.cell(SUMMARY_ROW, latest_col).value
+        latest_total_count, latest_turnover_total, _ = parse_summary_metrics(latest_summary)
+        latest_total = latest_total_count if latest_total_count is not None else "-"
+        latest_turnover = f"{latest_turnover_total:.0f} 亿" if latest_turnover_total is not None else "-"
+
+        ranking_pairs = []
+        for sector in sector_order:
+            main_row = row_map[sector]
+            count = parse_leading_int(ws_main.cell(main_row, latest_col).value) or 0
+            ranking_pairs.append((sector, count))
+        ranking_pairs.sort(key=lambda x: (-x[1], x[0]))
+        if ranking_pairs:
+            hottest_sector = ranking_pairs[0][0]
+            hottest_count = ranking_pairs[0][1]
+
+    style_card_block(ws, 7, 8, 1, 2, "最新交易日", latest_date, "FF1F78B4")
+    style_card_block(ws, 9, 10, 1, 2, "总涨停数", latest_total, "FF33A02C")
+    style_card_block(ws, 11, 12, 1, 2, "总成交额", latest_turnover, "FFFFA000")
+    style_card_block(ws, 13, 14, 1, 2, "最热板块", hottest_sector, "FFE63946")
+    style_card_block(ws, 15, 16, 1, 2, "板块峰值", hottest_count, "FF6A4C93")
+
     # 汇总表
-    ws["A1"] = "日期"
-    ws["B1"] = "总涨停数"
-    ws["C1"] = "总成交额(亿)"
-    ws["D1"] = "较前一日变化(亿)"
-    ws["E1"] = "市场标签"
+    headers = ["日期", "总涨停数", "总成交额(亿)", "较前一日变化(亿)", "市场标签"]
+    for idx, title in enumerate(headers, start=1):
+        cell = ws.cell(summary_header_row, idx)
+        cell.value = title
+        cell.fill = section_fill
+        cell.font = white_font
+        cell.alignment = center
+        apply_cell_border(cell, color="FFB7C9E2")
 
-    header_font = Font(bold=True)
-    for c in range(1, 6):
-        ws.cell(1, c).font = copy(header_font)
-        ws.cell(1, c).alignment = Alignment(horizontal="center", vertical="center")
-
-    for idx, (trade_date, col) in enumerate(sorted_items, start=2):
+    for idx, (trade_date, col) in enumerate(sorted_items, start=summary_data_row):
         summary_value = ws_main.cell(SUMMARY_ROW, col).value
         total_count, turnover_total, turnover_delta = parse_summary_metrics(summary_value)
-        market_tag = ""
-        if summary_value not in (None, ""):
-            lines = str(summary_value).splitlines()
-            if len(lines) >= 2:
-                line2 = lines[1]
-                if line2.endswith("上涨"):
-                    market_tag = "上涨"
-                elif line2.endswith("下跌"):
-                    market_tag = "下跌"
-                elif line2.endswith("震荡"):
-                    market_tag = "震荡"
+        market_tag = parse_market_tag(summary_value)
 
         ws.cell(idx, 1).value = datetime.strptime(trade_date, "%Y-%m-%d")
         ws.cell(idx, 1).number_format = "yyyy-mm-dd"
@@ -837,91 +975,216 @@ def rebuild_dashboard(wb: Workbook, ws_main, sector_order: List[str], row_map: D
         ws.cell(idx, 4).value = turnover_delta
         ws.cell(idx, 5).value = market_tag
 
-    last_row = max(ws.max_row, 2)
+        row_fill = stripe_fill if (idx - summary_data_row) % 2 == 0 else None
+        for col_idx in range(1, 6):
+            cell = ws.cell(idx, col_idx)
+            if row_fill:
+                cell.fill = row_fill
+            cell.alignment = center
+            apply_cell_border(cell, color="FFE2E8F0")
+            if col_idx == 5:
+                cell.font = Font(
+                    color=("FF0F9D58" if market_tag == "上涨" else "FFD93025" if market_tag == "下跌" else "FF5F6368"),
+                    bold=True,
+                )
 
-    # 图 1：总涨停数折线图
-    chart1 = LineChart()
-    chart1.title = "每日总涨停数"
-    chart1.y_axis.title = "家数"
-    chart1.x_axis.title = "日期"
-    data1 = Reference(ws, min_col=2, min_row=1, max_row=last_row)
-    cats = Reference(ws, min_col=1, min_row=2, max_row=last_row)
-    chart1.add_data(data1, titles_from_data=True)
-    chart1.set_categories(cats)
-    chart1.height = 8
-    chart1.width = 16
-    ws.add_chart(chart1, "G2")
+    last_row = max(ws.max_row, summary_data_row)
 
-    # 图 2：总成交额折线图
-    chart2 = LineChart()
-    chart2.title = "上证指数 + 深证成指总成交额"
-    chart2.y_axis.title = "亿"
-    chart2.x_axis.title = "日期"
-    data2 = Reference(ws, min_col=3, min_row=1, max_row=last_row)
-    chart2.add_data(data2, titles_from_data=True)
-    chart2.set_categories(cats)
-    chart2.height = 8
-    chart2.width = 16
-    ws.add_chart(chart2, "G20")
+    # 图表区
+    if len(sorted_items) >= 1:
+        cats = Reference(ws, min_col=1, min_row=summary_data_row, max_row=last_row)
 
-    # 图 3：成交额变化柱状图
-    chart3 = BarChart()
-    chart3.title = "较前一日成交额变化"
-    chart3.y_axis.title = "亿"
-    chart3.x_axis.title = "日期"
-    data3 = Reference(ws, min_col=4, min_row=1, max_row=last_row)
-    chart3.add_data(data3, titles_from_data=True)
-    chart3.set_categories(cats)
-    chart3.height = 8
-    chart3.width = 16
-    ws.add_chart(chart3, "G38")
+        chart1 = LineChart()
+        chart1.title = "每日总涨停数"
+        chart1.add_data(Reference(ws, min_col=2, min_row=summary_header_row, max_row=last_row), titles_from_data=True)
+        chart1.set_categories(cats)
+        beautify_chart(chart1, style_id=13, y_title="家数", x_title="日期")
+        ws.add_chart(chart1, "G6")
 
-    # 最近 60 交易日板块热力表
+        chart2 = LineChart()
+        chart2.title = "上证指数 + 深证成指总成交额"
+        chart2.add_data(Reference(ws, min_col=3, min_row=summary_header_row, max_row=last_row), titles_from_data=True)
+        chart2.set_categories(cats)
+        beautify_chart(chart2, style_id=12, y_title="亿", x_title="日期")
+        ws.add_chart(chart2, "G22")
+
+        chart3 = BarChart()
+        chart3.title = "较前一日成交额变化"
+        chart3.add_data(Reference(ws, min_col=4, min_row=summary_header_row, max_row=last_row), titles_from_data=True)
+        chart3.set_categories(cats)
+        beautify_chart(chart3, style_id=11, y_title="亿", x_title="日期")
+        chart3.dLbls = DataLabelList()
+        chart3.dLbls.showVal = True
+        ws.add_chart(chart3, "G38")
+
+    # 最新交易日板块 TOP10
+    rank_header_row = 6
+    rank_start_row = 7
+    rank_title_cell = ws.cell(rank_header_row, 18)
+    rank_title_cell.value = "最新交易日板块热度 TOP10"
+    rank_title_cell.fill = section_fill
+    rank_title_cell.font = white_font
+    rank_title_cell.alignment = center
+    apply_cell_border(rank_title_cell, color="FFB7C9E2")
+    ws.cell(rank_header_row, 19).fill = section_fill
+    apply_cell_border(ws.cell(rank_header_row, 19), color="FFB7C9E2")
+    ws.cell(rank_header_row, 19).font = white_font
+
+    if sorted_items:
+        latest_col = sorted_items[-1][1]
+        ranked = []
+        for sector in sector_order:
+            main_row = row_map[sector]
+            count = parse_leading_int(ws_main.cell(main_row, latest_col).value) or 0
+            ranked.append((sector, count))
+        ranked = sorted(ranked, key=lambda x: (-x[1], x[0]))[:10]
+
+        ws.cell(rank_header_row, 18).value = "板块"
+        ws.cell(rank_header_row, 19).value = "涨停数"
+        for cell in (ws.cell(rank_header_row, 18), ws.cell(rank_header_row, 19)):
+            cell.fill = section_fill
+            cell.font = white_font
+            cell.alignment = center
+            apply_cell_border(cell, color="FFB7C9E2")
+
+        for offset, (sector, count) in enumerate(ranked, start=rank_start_row):
+            ws.cell(offset, 18).value = sector
+            ws.cell(offset, 19).value = count
+            for col_idx in (18, 19):
+                cell = ws.cell(offset, col_idx)
+                if (offset - rank_start_row) % 2 == 0:
+                    cell.fill = stripe_fill
+                cell.alignment = center
+                apply_cell_border(cell, color="FFE2E8F0")
+
+        if ranked:
+            chart4 = BarChart()
+            chart4.type = "bar"
+            chart4.title = "最新交易日强势板块"
+            chart4.add_data(Reference(ws, min_col=19, min_row=rank_header_row, max_row=rank_start_row + len(ranked) - 1), titles_from_data=True)
+            chart4.set_categories(Reference(ws, min_col=18, min_row=rank_start_row, max_row=rank_start_row + len(ranked) - 1))
+            beautify_chart(chart4, style_id=10, y_title="板块", x_title="涨停数")
+            chart4.dLbls = DataLabelList()
+            chart4.dLbls.showVal = True
+            ws.add_chart(chart4, "Q22")
+
+    # 最近 60 交易日板块热力图
     recent_items = sorted_items[-60:] if len(sorted_items) > 60 else sorted_items
-    start_row = last_row + 3
-    ws.cell(start_row, 1).value = "最近 60 个交易日板块热力表"
-    ws.cell(start_row, 1).font = Font(bold=True)
-    ws.cell(start_row + 1, 1).value = "板块"
+    start_row = max(last_row + 5, 56)
+    ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=max(10, len(recent_items) + 3))
+    title_cell = ws.cell(start_row, 1)
+    title_cell.value = "最近 60 个交易日板块热力图"
+    title_cell.fill = title_fill
+    title_cell.font = Font(color="FFFFFFFF", bold=True, size=13)
+    title_cell.alignment = Alignment(horizontal="left", vertical="center")
+
+    write_heat_legend(ws, start_row + 1, 1)
+
+    header_row = start_row + 2
+    ws.cell(header_row, 1).value = "板块"
+    ws.cell(header_row, 1).fill = section_fill
+    ws.cell(header_row, 1).font = white_font
+    ws.cell(header_row, 1).alignment = center
+    apply_cell_border(ws.cell(header_row, 1), color="FFB7C9E2")
+
     for offset, (trade_date, _) in enumerate(recent_items, start=2):
-        c = ws.cell(start_row + 1, offset)
+        c = ws.cell(header_row, offset)
         c.value = datetime.strptime(trade_date, "%Y-%m-%d")
         c.number_format = "mm-dd"
-        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.fill = section_fill
+        c.font = white_font
+        c.alignment = center
+        apply_cell_border(c, color="FFB7C9E2")
 
-    for row_offset, sector in enumerate(sector_order, start=2):
-        ws.cell(start_row + row_offset, 1).value = sector
+    total_col = len(recent_items) + 2
+    peak_col = total_col + 1
+    ws.cell(header_row, total_col).value = "60日合计"
+    ws.cell(header_row, peak_col).value = "单日峰值"
+    for col_idx in (total_col, peak_col):
+        c = ws.cell(header_row, col_idx)
+        c.fill = section_fill
+        c.font = white_font
+        c.alignment = center
+        apply_cell_border(c, color="FFB7C9E2")
+
+    for row_offset, sector in enumerate(sector_order, start=1):
+        current_row = header_row + row_offset
+        label_cell = ws.cell(current_row, 1)
+        label_cell.value = sector
+        label_cell.fill = header_fill if row_offset % 2 else stripe_fill
+        label_cell.font = strong_font
+        label_cell.alignment = center
+        apply_cell_border(label_cell, color="FFE2E8F0")
+
         main_row = row_map[sector]
+        values = []
         for col_offset, (_, main_col) in enumerate(recent_items, start=2):
-            count = parse_leading_int(ws_main.cell(main_row, main_col).value)
-            ws.cell(start_row + row_offset, col_offset).value = count or 0
+            count = parse_leading_int(ws_main.cell(main_row, main_col).value) or 0
+            values.append(count)
+            heat_cell = ws.cell(current_row, col_offset)
+            heat_cell.value = count
+            fill_color, font_color = build_heat_fill(count)
+            heat_cell.fill = PatternFill("solid", fgColor=fill_color)
+            heat_cell.font = Font(color=font_color, bold=(count >= 4))
+            heat_cell.alignment = center
+            apply_cell_border(heat_cell, color="FFFFFFFF")
 
-    heatmap_top = start_row + 2
-    heatmap_left = 2
-    heatmap_bottom = start_row + 1 + len(sector_order)
-    heatmap_right = 1 + len(recent_items)
+        total_cell = ws.cell(current_row, total_col)
+        peak_cell = ws.cell(current_row, peak_col)
+        total_cell.value = sum(values)
+        peak_cell.value = max(values) if values else 0
+        for metric_cell in (total_cell, peak_cell):
+            metric_cell.fill = PatternFill("solid", fgColor="FFF8FBFF")
+            metric_cell.font = strong_font
+            metric_cell.alignment = center
+            apply_cell_border(metric_cell, color="FFE2E8F0")
 
-    if heatmap_right >= heatmap_left:
-        color_range = f"{get_column_letter(heatmap_left)}{heatmap_top}:{get_column_letter(heatmap_right)}{heatmap_bottom}"
-        ws.conditional_formatting.add(
-            color_range,
-            ColorScaleRule(
-                start_type="num",
-                start_value=0,
-                start_color="FFF2F2F2",
-                mid_type="percentile",
-                mid_value=50,
-                mid_color="FFFFEB84",
-                end_type="num",
-                end_value=8,
-                end_color="FFFF6666",
-            ),
-        )
+    bottom_row = header_row + len(sector_order)
 
+    # 列底部增加每日热度合计，更容易看出情绪高低切换
+    footer_row = bottom_row + 1
+    ws.cell(footer_row, 1).value = "单日合计"
+    ws.cell(footer_row, 1).fill = section_fill
+    ws.cell(footer_row, 1).font = white_font
+    ws.cell(footer_row, 1).alignment = center
+    apply_cell_border(ws.cell(footer_row, 1), color="FFB7C9E2")
+
+    for col_idx in range(2, total_col):
+        col_sum = sum((ws.cell(row_idx, col_idx).value or 0) for row_idx in range(header_row + 1, bottom_row + 1))
+        c = ws.cell(footer_row, col_idx)
+        c.value = col_sum
+        fill_color, font_color = build_heat_fill(int(math.ceil(col_sum / max(len(sector_order), 1))))
+        c.fill = PatternFill("solid", fgColor=fill_color)
+        c.font = Font(color=font_color, bold=True)
+        c.alignment = center
+        apply_cell_border(c, color="FFE2E8F0")
+
+    for col_idx in (total_col, peak_col):
+        c = ws.cell(footer_row, col_idx)
+        c.value = None
+        c.fill = PatternFill("solid", fgColor="FFEAF2FF")
+        apply_cell_border(c, color="FFE2E8F0")
+
+    # 列宽与行高
     ws.column_dimensions["A"].width = 16
     for col in range(2, 6):
         ws.column_dimensions[get_column_letter(col)].width = 14
-    for col in range(6, min(ws.max_column, 80) + 1):
-        ws.column_dimensions[get_column_letter(col)].width = 10
+    for col in range(7, 17):
+        ws.column_dimensions[get_column_letter(col)].width = 11
+    ws.column_dimensions["R"].width = 18
+    ws.column_dimensions["S"].width = 10
+    for col in range(2, total_col):
+        ws.column_dimensions[get_column_letter(col)].width = 5.6
+    ws.column_dimensions[get_column_letter(total_col)].width = 10
+    ws.column_dimensions[get_column_letter(peak_col)].width = 10
+
+    ws.row_dimensions[1].height = 24
+    ws.row_dimensions[2].height = 28
+    ws.row_dimensions[3].height = 22
+    ws.row_dimensions[summary_header_row].height = 22
+    ws.row_dimensions[header_row].height = 22
+    for row_idx in range(header_row + 1, footer_row + 1):
+        ws.row_dimensions[row_idx].height = 20
 
 
 def determine_update_range(
